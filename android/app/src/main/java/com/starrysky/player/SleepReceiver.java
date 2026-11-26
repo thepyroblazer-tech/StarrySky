@@ -17,16 +17,16 @@ public class SleepReceiver extends BroadcastReceiver {
         am.cancel(pi);
         if (Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi);
         else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi);
-        Spot.prefs(ctx).edit().putLong(KEY_AT, at).apply();
+        Player.prefs(ctx).edit().putLong(KEY_AT, at).apply();
     }
 
     static void cancel(Context ctx) {
         ((AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE)).cancel(pending(ctx));
-        Spot.prefs(ctx).edit().remove(KEY_AT).apply();
+        Player.prefs(ctx).edit().remove(KEY_AT).apply();
     }
 
     static long endsAt(Context ctx) {
-        long at = Spot.prefs(ctx).getLong(KEY_AT, 0);
+        long at = Player.prefs(ctx).getLong(KEY_AT, 0);
         return at > System.currentTimeMillis() ? at : 0;
     }
 
@@ -38,17 +38,8 @@ public class SleepReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context ctx, Intent intent) {
         final Context app = ctx.getApplicationContext();
-        Spot.prefs(app).edit().remove(KEY_AT).apply();
-        final PendingResult done = goAsync();
-        new Thread(() -> {
-            try {
-                Spot.api(app, "PUT", "/me/player/pause", null);
-                Spot.prefs(app).edit().putBoolean("w_playing", false).apply();
-            } catch (Exception ignored) {
-            } finally {
-                PlayerWidget.render(app);
-                done.finish();
-            }
-        }).start();
+        Player.prefs(app).edit().remove(KEY_AT).apply();
+        Player.control(app, "pause", null);
+        PlayerWidget.render(app);
     }
 }
