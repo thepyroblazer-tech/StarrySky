@@ -47,8 +47,11 @@
       <section class="view active" data-view="now">
         <div class="now">
           <div class="cover-wrap">
-            <img id="cover" class="cover" alt="">
+            <div class="cover-swipe" id="coverSwipe">
+              <img id="cover" class="cover" alt="" draggable="false">
+            </div>
           </div>
+          <div class="swipe-tip muted">Swipe the cover left for next, right for previous</div>
           <div class="now-meta">
             <div class="now-text">
               <div id="title" class="now-title">Nothing playing</div>
@@ -87,6 +90,13 @@
             <svg viewBox="0 0 24 24" class="ic small"><path d="M11 5L6 9H2v6h4l5 4z"/></svg>
             <input type="range" id="volume" min="0" max="100" value="50" aria-label="Volume">
             <svg viewBox="0 0 24 24" class="ic small"><path d="M11 5L6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
+          </div>
+
+          <div class="extras">
+            <button class="sleep-btn" id="sleepBtn">
+              <svg viewBox="0 0 24 24" class="ic small"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+              <span id="sleepLabel">Sleep timer</span>
+            </button>
           </div>
         </div>
       </section>
