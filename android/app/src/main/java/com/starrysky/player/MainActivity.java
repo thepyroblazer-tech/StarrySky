@@ -170,5 +170,37 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public void setBarColor(String color) { /* bars are transparent; the theme shows through */ }
+
+        /* Login storage shared with the widget and sleep timer. */
+        @JavascriptInterface
+        public String tokenGet() { return Spot.tokenJson(MainActivity.this); }
+
+        @JavascriptInterface
+        public void tokenSet(String json) {
+            Spot.saveTokenJson(MainActivity.this, json);
+            if (json == null || json.isEmpty()) {
+                Spot.prefs(MainActivity.this).edit().putString("w_title", "StarrySky").putString("w_artist", "Open the app to connect Spotify").remove("w_cover_done").apply();
+                PlayerWidget.render(MainActivity.this);
+            }
+        }
+
+        @JavascriptInterface
+        public void widgetUpdate(String json) { PlayerWidget.pushFromApp(MainActivity.this, json); }
+
+        @JavascriptInterface
+        public void sleepSet(String atMillis) {
+            try { SleepReceiver.schedule(MainActivity.this, Long.parseLong(atMillis)); } catch (NumberFormatException ignored) { }
+        }
+
+        @JavascriptInterface
+        public String sleepGet() { return String.valueOf(SleepReceiver.endsAt(MainActivity.this)); }
+
+        @JavascriptInterface
+        public void sleepCancel() { SleepReceiver.cancel(MainActivity.this); }
+
+        @JavascriptInterface
+        public void haptic() {
+            runOnUiThread(() -> web.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM));
+        }
     }
 }
