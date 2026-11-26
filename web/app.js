@@ -135,6 +135,8 @@
     $('#artist').textContent = t ? artistNames(t) : 'Start music in Spotify, or tap the device button';
     const src = t ? pickImage(t.album ? t.album.images : t.images, 600) : BLANK;
     if ($('#cover').getAttribute('src') !== src) $('#cover').src = src;
+    Themes.setArtwork(t ? src : '');
+    syncWidget();
     $('#cover').classList.toggle('spinning', !!(p && p.is_playing));
     $('#playIcon').innerHTML = p && p.is_playing ? '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
     $('#shuffleBtn').classList.toggle('on', !!(p && p.shuffle_state));
@@ -159,6 +161,86 @@
     $('#miniPlayPath').setAttribute('d', p.is_playing ? 'M6 5h4v14H6zM14 5h4v14h-4z' : 'M8 5v14l11-7z');
   }
   setInterval(() => { if (!document.hidden && S.player && S.player.is_playing) renderProgress(); }, 500);
+
+  /* ---------------- home-screen widget ---------------- */
+  let widgetKey = '';
+  function syncWidget() {
+    if (S.demo || !native() || !native().widgetUpdate) return;
+    const p = S.player, t = p && p.item;
+    const data = { title: t ? t.name : '', artist: t ? artistNames(t) : '', playing: !!(p && p.is_playing), cover: t ? trackImg(t, 300) : '', accent: Themes.accentHex() };
+    const key = JSON.stringify(data);
+    if (key === widgetKey) return;
+    widgetKey = key; native().widgetUpdate(key);
+  }
+
+  /* ---------------- swipe the cover to change song ---------------- */
+  (function coverSwipe() {
+    const sw = $('#coverSwipe'); let sx = null, dx = 0, busy = false;
+    const reset = anim => { sw.style.transition = anim ? 'transform .45s cubic-bezier(.2,.9,.3,1.15), opacity .35s' : 'none'; sw.style.transform = ''; sw.style.opacity = ''; };
+    sw.addEventListener('pointerdown', e => {
+      if (busy || !(S.player && S.player.item)) return;
+      sx = e.clientX; dx = 0; sw.style.transition = 'none';
+      try { sw.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    });
+    sw.addEventListener('pointermove', e => {
+      if (sx == null) return;
+      dx = e.clientX - sx;
+      sw.style.transform = `translateX(${dx}px) rotate(${dx / 16}deg)`;
+      sw.style.opacity = String(1 - Math.min(.45, Math.abs(dx) / 700));
+    });
+    const end = async () => {
+      if (sx == null) return; sx = null;
+      const dir = dx < -70 ? 1 : dx > 70 ? -1 : 0; // left = next, right = previous
+      if (!dir) { reset(true); return; }
+      busy = true; haptic();
+      sw.style.transition = 'transform .22s ease-in, opacity .22s';
+      sw.style.transform = `translateX(${dir > 0 ? -130 : 130}vw) rotate(${dir > 0 ? -25 : 25}deg)`; sw.style.opacity = '0';
+      try { await api(dir > 0 ? '/me/player/next' : '/me/player/previous', { method: 'POST' }); } catch (err) { handleError(err); }
+      await new Promise(r => setTimeout(r, 380));
+      await refreshPlayer();
+      sw.style.transition = 'none'; sw.style.transform = `translateX(${dir > 0 ? 130 : -130}vw) rotate(${dir > 0 ? 25 : -25}deg)`;
+      void sw.offsetWidth; // apply the start position before animating in
+      reset(true); busy = false;
+    };
+    sw.addEventListener('pointerup', end); sw.addEventListener('pointercancel', end);
+  })();
+
+  /* ---------------- sleep timer ---------------- */
+  const useNativeSleep = () => !S.demo && native() && native().sleepSet;
+  const Sleep = {
+    endsAt() { return useNativeSleep() ? (+native().sleepGet() || 0) : (S.sleepAt || 0); },
+    set(at) { if (useNativeSleep()) native().sleepSet(String(Math.round(at))); else S.sleepAt = at; renderSleep(); },
+    cancel() { if (useNativeSleep()) native().sleepCancel(); S.sleepAt = 0; renderSleep(); },
+  };
+  function renderSleep() {
+    const left = Sleep.endsAt() - Date.now(), on = left > 0;
+    $('#sleepBtn').classList.toggle('on', on);
+    $('#sleepLabel').textContent = on ? 'Stops in ' + fmt(left) : 'Sleep timer';
+  }
+  setInterval(() => {
+    if (S.sleepAt && Date.now() >= S.sleepAt && !useNativeSleep()) {
+      S.sleepAt = 0; api('/me/player/pause', { method: 'PUT' }).catch(() => {}).finally(() => soon(200)); toast('Sleep timer: music paused. Good night ✦');
+    }
+    if (!document.hidden) renderSleep();
+  }, 1000);
+  $('#sleepBtn').onclick = () => {
+    const on = Sleep.endsAt() > Date.now();
+    const mins = [5, 15, 30, 45, 60, 90];
+    openSheet('<div class="section-title">Sleep timer</div><p class="muted small">Pauses Spotify when the time is up, even if StarrySky is closed.</p><div class="sleep-grid">' +
+      mins.map(m => `<button class="chip big" data-min="${m}">${m < 60 ? m + ' min' : (m / 60) + (m === 60 ? ' hour' : ' hours')}</button>`).join('') +
+      '<button class="chip big" data-min="song">End of this song</button></div>' +
+      (on ? '<button class="btn ghost" id="sleepOff">Turn the timer off</button>' : ''));
+    $$('#sheetBody [data-min]').forEach(b => b.onclick = () => {
+      let at;
+      if (b.dataset.min === 'song') {
+        const t = S.player && S.player.item;
+        if (!t) { toast('Nothing is playing.'); return; }
+        at = Date.now() + (t.duration_ms - livePos()) + 800;
+      } else at = Date.now() + (+b.dataset.min) * 60000;
+      Sleep.set(at); closeSheet(); toast('Music will pause in ' + fmt(at - Date.now()));
+    });
+    const off = $('#sleepOff'); if (off) off.onclick = () => { Sleep.cancel(); closeSheet(); toast('Sleep timer off'); };
+  };
 
   async function control(fn, optimistic) {
     if (optimistic && S.player) { optimistic(S.player); renderPlayer(); }
@@ -236,19 +318,60 @@
   const PLUS = '<svg viewBox="0 0 24 24" class="ic"><path d="M3 6h12M3 12h12M3 18h7M18 13v8M14 17h8"/></svg>';
   function trackRows(tracks, opts = {}) {
     const cur = S.player && S.player.item && S.player.item.uri;
-    return '<div class="rows">' + tracks.map((t, i) => t ? `
+    return '<div class="rows">' + tracks.map((t, i) => {
+      if (!t) return '';
+      const row = `
       <div class="row${t.uri === cur ? ' playing' : ''}" data-i="${i}">
         <img src="${esc(trackImg(t, 64))}" alt="" loading="lazy">
         <div class="rt"><div class="t1">${esc(t.name)}</div><div class="t2">${esc(artistNames(t))}</div></div>
         ${opts.noAdd ? '' : `<button class="add" data-q="${i}" title="Add to queue">${PLUS}</button>`}
-      </div>` : '').join('') + '</div>';
+      </div>`;
+      return opts.noAdd ? row : `<div class="swipe-wrap"><div class="swipe-hint">${PLUS}<span>Add to queue</span></div>${row}</div>`;
+    }).join('') + '</div>';
   }
   function bindTrackRows(root, tracks, playFn) {
     root.querySelectorAll('.row[data-i]').forEach(r => r.onclick = e => {
+      if (r.dataset.swiped) return;
       const i = +r.dataset.i, t = tracks[i];
       if (e.target.closest('[data-q]')) { addToQueue(t); return; }
       playFn(t, i);
     });
+    root.querySelectorAll('.swipe-wrap').forEach(w => attachRowSwipe(w, tracks));
+  }
+
+  /* Drag a song row to the left to add it to the queue. */
+  const QUEUE_PULL = 90;
+  function attachRowSwipe(wrap, tracks) {
+    const row = wrap.querySelector('.row'); let sx = null, sy = 0, dx = 0, mode = null;
+    row.addEventListener('pointerdown', e => { sx = e.clientX; sy = e.clientY; dx = 0; mode = null; row.style.transition = 'none'; });
+    row.addEventListener('pointermove', e => {
+      if (sx == null) return;
+      const mx = e.clientX - sx, my = e.clientY - sy;
+      if (!mode) {
+        if (Math.abs(mx) > 10 && Math.abs(mx) > Math.abs(my) * 1.4) { mode = 'h'; try { row.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } }
+        else if (Math.abs(my) > 10) mode = 'v';
+      }
+      if (mode !== 'h') return;
+      dx = Math.min(0, mx); if (dx < -QUEUE_PULL) dx = -QUEUE_PULL + (dx + QUEUE_PULL) * .35;
+      row.style.transform = `translateX(${dx}px)`;
+      const armed = mx < -QUEUE_PULL;
+      if (armed && !wrap.classList.contains('armed')) haptic();
+      wrap.classList.toggle('armed', armed);
+    });
+    const end = () => {
+      if (mode === 'h') {
+        row.dataset.swiped = '1'; setTimeout(() => { delete row.dataset.swiped; }, 60);
+        if (wrap.classList.contains('armed')) { addToQueue(tracks[+row.dataset.i]); wrap.classList.add('done'); }
+        row.style.transition = 'transform .35s cubic-bezier(.2,.9,.3,1.15)'; row.style.transform = '';
+        setTimeout(() => wrap.classList.remove('armed', 'done'), 700);
+      }
+      sx = null; mode = null;
+    };
+    row.addEventListener('pointerup', end); row.addEventListener('pointercancel', end);
+  }
+  function haptic() {
+    if (native() && native().haptic) native().haptic();
+    else if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) { /* not allowed */ } }
   }
   function addToQueue(t) {
     api('/me/player/queue', { method: 'POST', query: { uri: t.uri } }).then(() => toast('Added to queue: ' + t.name)).catch(handleError);
@@ -374,6 +497,7 @@
     document.documentElement.style.setProperty('--sab', bottom + 'px');
   };
   window.onNativeAuth = url => finishAuth(url);
+  window.onThemeColors = () => { if (S.view === 'themes') renderThemes(); };
   window.onNativeResume = () => { if (!$('#main').hidden) refreshPlayer(); };
 
   /* ---------------- boot ---------------- */
