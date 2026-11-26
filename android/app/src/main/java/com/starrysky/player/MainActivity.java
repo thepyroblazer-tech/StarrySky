@@ -8,6 +8,8 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
+import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.WindowInsets;
 import android.webkit.JavascriptInterface;
@@ -22,16 +24,16 @@ import androidx.webkit.WebViewAssetLoader;
 
 import org.json.JSONObject;
 
-/** Thin shell around the web UI in assets/. Login happens in the browser and comes back via starrysky://callback. */
+/** Thin shell around the web UI in assets/. Music info and controls come from Player (Android media sessions). */
 public class MainActivity extends Activity {
-    static final String REDIRECT = "starrysky://callback";
     static final String HOME = "https://appassets.androidplatform.net/assets/index.html";
 
     private WebView web;
     private WebViewAssetLoader assets;
-    private volatile String pendingAuth = "";
     private boolean pageReady = false;
     private int insetTop = 0, insetBottom = 0;
+    private String sentArtId = "";
+    private final Runnable onPlayerChanged = this::pushState;
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override
@@ -53,7 +55,6 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true);
         s.setAllowFileAccess(false);
         s.setAllowContentAccess(false);
-        s.setMediaPlaybackRequiresUserGesture(true);
         web.addJavascriptInterface(new Bridge(), "StarryNative");
         web.setWebViewClient(new WebViewClient() {
             @Override
@@ -72,6 +73,7 @@ public class MainActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 pageReady = true;
+                sentArtId = "";
                 pushInsets();
             }
         });
@@ -90,7 +92,6 @@ public class MainActivity extends Activity {
         });
 
         setContentView(web);
-        handleIntent(getIntent());
         web.loadUrl(HOME);
     }
 
@@ -100,33 +101,30 @@ public class MainActivity extends Activity {
         web.evaluateJavascript("window.onNativeInsets && window.onNativeInsets(" + Math.round(insetTop / d) + "," + Math.round(insetBottom / d) + ")", null);
     }
 
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        setIntent(intent);
-        handleIntent(intent);
-    }
-
-    private void handleIntent(Intent intent) {
-        Uri data = intent == null ? null : intent.getData();
-        if (data == null || !data.toString().startsWith(REDIRECT)) return;
-        String url = data.toString();
-        if (pageReady) {
-            web.evaluateJavascript("window.onNativeAuth && window.onNativeAuth(" + JSONObject.quote(url) + ")", null);
-        } else {
-            pendingAuth = url;
-        }
+    /** Sends the latest song/playback state to the page; the cover is only sent when the song changes. */
+    private void pushState() {
+        if (!pageReady) return;
+        String json = Player.stateJson(this, true);
+        try {
+            JSONObject j = new JSONObject(json);
+            String id = j.optString("artId");
+            if (id.equals(sentArtId)) j.remove("art"); else sentArtId = id;
+            json = j.toString();
+        } catch (Exception ignored) { }
+        web.evaluateJavascript("window.onNativePlayer && window.onNativePlayer(" + JSONObject.quote(json) + ")", null);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         web.onResume();
+        Player.watch(onPlayerChanged);
         if (pageReady) web.evaluateJavascript("window.onNativeResume && window.onNativeResume()", null);
     }
 
     @Override
     protected void onPause() {
+        Player.unwatch(onPlayerChanged);
         web.onPause();
         super.onPause();
     }
@@ -145,47 +143,72 @@ public class MainActivity extends Activity {
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(i);
         } catch (ActivityNotFoundException e) {
+            if (url.equals("spotify:")) { Player.openSpotify(this); return; }
             Toast.makeText(this, url.startsWith("spotify:") ? "The Spotify app isn't installed." : "No app can open that link.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void startSettings(Intent primary, Intent fallback) {
+        try { startActivity(primary); } catch (Exception e) {
+            try { startActivity(fallback); } catch (Exception ignored) { }
         }
     }
 
     /** Methods callable from JavaScript as window.StarryNative.*. */
     class Bridge {
         @JavascriptInterface
-        public String redirectUri() { return REDIRECT; }
+        public boolean hasAccess() { return Player.hasAccess(MainActivity.this); }
 
         @JavascriptInterface
-        public void openExternal(String url) {
-            if (url == null) return;
-            if (!(url.startsWith("https://accounts.spotify.com/") || url.startsWith("spotify:") || url.startsWith("https://open.spotify.com/"))) return;
-            runOnUiThread(() -> MainActivity.this.openExternal(url));
-        }
-
-        @JavascriptInterface
-        public String takePendingAuth() {
-            String p = pendingAuth;
-            pendingAuth = "";
-            return p;
-        }
-
-        @JavascriptInterface
-        public void setBarColor(String color) { /* bars are transparent; the theme shows through */ }
-
-        /* Login storage shared with the widget and sleep timer. */
-        @JavascriptInterface
-        public String tokenGet() { return Spot.tokenJson(MainActivity.this); }
-
-        @JavascriptInterface
-        public void tokenSet(String json) {
-            Spot.saveTokenJson(MainActivity.this, json);
-            if (json == null || json.isEmpty()) {
-                Spot.prefs(MainActivity.this).edit().putString("w_title", "StarrySky").putString("w_artist", "Open the app to connect Spotify").remove("w_cover_done").apply();
-                PlayerWidget.render(MainActivity.this);
+        public void openAccessSettings() {
+            Intent fallback = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
+            if (Build.VERSION.SDK_INT >= 30) {
+                Intent detail = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
+                        .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, Player.listener(MainActivity.this).flattenToString());
+                runOnUiThread(() -> startSettings(detail, fallback));
+            } else {
+                runOnUiThread(() -> startSettings(fallback, fallback));
             }
         }
 
         @JavascriptInterface
-        public void widgetUpdate(String json) { PlayerWidget.pushFromApp(MainActivity.this, json); }
+        public void openAppInfo() {
+            Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()));
+            runOnUiThread(() -> startSettings(i, new Intent(Settings.ACTION_SETTINGS)));
+        }
+
+        @JavascriptInterface
+        public String playerState() {
+            String json = Player.stateJson(MainActivity.this, true);
+            try { sentArtId = new JSONObject(json).optString("artId"); } catch (Exception ignored) { }
+            return json;
+        }
+
+        @JavascriptInterface
+        public void control(String cmd, String arg) { Player.control(MainActivity.this, cmd, arg); }
+
+        @JavascriptInterface
+        public String volumeGet() { return Player.volumeJson(MainActivity.this); }
+
+        @JavascriptInterface
+        public void volumeSet(String pct) {
+            try { Player.setVolume(MainActivity.this, Integer.parseInt(pct)); } catch (NumberFormatException ignored) { }
+        }
+
+        @JavascriptInterface
+        public void setAccent(String hex) {
+            if (hex == null || !hex.matches("#[0-9a-fA-F]{6}")) return;
+            if (hex.equalsIgnoreCase(Player.prefs(MainActivity.this).getString("accent", ""))) return;
+            Player.prefs(MainActivity.this).edit().putString("accent", hex).apply();
+            runOnUiThread(() -> PlayerWidget.render(MainActivity.this));
+        }
+
+        @JavascriptInterface
+        public void openExternal(String url) {
+            if (url == null) return;
+            if (!(url.startsWith("spotify:") || url.startsWith("https://open.spotify.com/"))) return;
+            runOnUiThread(() -> MainActivity.this.openExternal(url));
+        }
 
         @JavascriptInterface
         public void sleepSet(String atMillis) {
@@ -200,7 +223,7 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public void haptic() {
-            runOnUiThread(() -> web.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM));
+            runOnUiThread(() -> web.performHapticFeedback(HapticFeedbackConstants.CONFIRM));
         }
     }
 }
