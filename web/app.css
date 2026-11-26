@@ -68,6 +68,25 @@ h2 { font-size: 15px; margin: 26px 0 10px; color: var(--sub); text-transform: up
   box-shadow: 0 0 30px 2px color-mix(in srgb, var(--text) 35%, transparent), 0 0 0 3px color-mix(in srgb, var(--text) 70%, transparent);
   animation: spin 25s linear infinite; animation-play-state: paused; }
 .cover.spinning { animation-play-state: running; }
+.cover-swipe { touch-action: none; cursor: grab; will-change: transform; border-radius: 50%; }
+.cover-swipe:active { cursor: grabbing; }
+.swipe-tip { text-align: center; font-size: 11px; margin-top: -14px; opacity: .55; letter-spacing: .02em; }
+.extras { display: flex; justify-content: center; }
+.sleep-btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; background: var(--bar); border: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--sub); font-variant-numeric: tabular-nums; }
+.sleep-btn.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 60%, transparent); box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 25%, transparent); }
+.sleep-btn .ic { opacity: 1; }
+.sleep-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 4px; }
+.chip.big { padding: 13px; font-size: 15px; border-radius: 14px; background: rgba(255,255,255,.09); border: 1px solid var(--line); }
+.chip.big:active { background: var(--accent); color: var(--accent-ink); }
+
+/* drag a song row left to queue it */
+.swipe-wrap { position: relative; border-radius: 12px; overflow: hidden; }
+.swipe-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-right: 18px; border-radius: 12px;
+  background: linear-gradient(to left, color-mix(in srgb, var(--accent) 35%, transparent), transparent 75%); color: var(--accent); font-weight: 700; font-size: 13px; opacity: 0; transition: opacity .2s; }
+.swipe-wrap .row { position: relative; touch-action: pan-y; background: transparent; will-change: transform; }
+.swipe-wrap:has(.row[style*="translateX"]) .swipe-hint { opacity: .55; }
+.swipe-wrap.armed .swipe-hint { opacity: 1; background: linear-gradient(to left, var(--accent), color-mix(in srgb, var(--accent) 20%, transparent) 80%); color: var(--accent-ink); }
+.swipe-wrap.done .swipe-hint span::after { content: " ✓"; }
 .no-spin .cover { animation: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
