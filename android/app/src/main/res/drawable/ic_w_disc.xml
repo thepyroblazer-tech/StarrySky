@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder cover: a dark disc with a small star -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="54dp" android:height="54dp" android:viewportWidth="54" android:viewportHeight="54">
+    <path android:fillColor="#FF1B2638" android:pathData="M27,0a27,27 0,1 0,0.01 0z" />
+    <path android:fillColor="#FFFFF3C4"
+        android:pathData="M27,17 L29.5,24.5 L37,27 L29.5,29.5 L27,37 L24.5,29.5 L17,27 L24.5,24.5 Z" />
+</vector>
