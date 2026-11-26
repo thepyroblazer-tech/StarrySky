@@ -85,7 +85,12 @@ h2 { font-size: 15px; margin: 26px 0 10px; color: var(--sub); text-transform: up
 .quick-tile:active { transform: scale(.96); }
 #searchForm .btn { margin-top: 10px; }
 .act-ic { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.08); color: var(--accent); flex: none; }
-#seek:disabled { opacity: .4; }
+#seek:disabled { pointer-events: none; }
+#seek:disabled::-webkit-slider-thumb { opacity: 0; }
+.hint { margin-bottom: 4px; }
+.hint-title { font-weight: 800; font-size: 17px; color: var(--accent); }
+.hint .steps { margin: 10px 0 0; font-size: 14px; }
+.hint .btn { margin-top: 4px; }
 .steps li { margin-bottom: 12px; }
 
 /* drag a song row left to queue it */
