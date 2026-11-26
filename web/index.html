@@ -16,19 +16,7 @@
     <div class="setup-card">
       <div class="brand"><span class="brand-star">✦</span> StarrySky</div>
 
-      <div id="setupPhone">
-        <p class="muted">StarrySky controls Spotify the same way your lock screen does. It works with free Spotify, and you don't need to log in.</p>
-        <p>It needs one permission so it can see what's playing:</p>
-        <ol class="steps">
-          <li>Tap <b>Open notification access</b>, find <b>StarrySky</b> and switch it on.</li>
-          <li>If Android says <b>“Restricted setting”</b>, tap <b>Open app info</b>, then the <b>⋮</b> menu at the top right → <b>Allow restricted settings</b>, and try step 1 again. Android does this for apps installed outside the Play Store.</li>
-          <li>Come back here. StarrySky will start by itself.</li>
-        </ol>
-        <button id="accessBtn" class="btn primary">Open notification access</button>
-        <button id="appInfoBtn" class="btn ghost">Open app info</button>
-      </div>
-
-      <p id="setupBrowser" class="muted" hidden>This is the phone app's screen. On a PC you can try it in demo mode.</p>
+      <p class="muted">StarrySky is a phone app. On a PC you can try it in demo mode.</p>
       <button id="demoBtn" class="btn ghost">Try the demo</button>
     </div>
   </section>
@@ -47,6 +35,15 @@
       <!-- Now playing -->
       <section class="view active" data-view="now">
         <div class="now">
+          <div class="card pad hint" id="hint" hidden>
+            <div class="hint-title">✦ One setting in Spotify</div>
+            <ol class="steps">
+              <li>Open <b>Spotify</b> → tap your <b>profile picture</b> → <b>Settings and privacy</b>.</li>
+              <li>Scroll to <b>Device Broadcast Status</b> (usually under <i>Playback</i> or <i>Apps and devices</i>) and switch it <b>on</b>.</li>
+              <li>Play any song. It appears here by itself.</li>
+            </ol>
+            <button class="btn primary" id="hintOpen">Open Spotify</button>
+          </div>
           <div class="cover-wrap">
             <div class="cover-swipe" id="coverSwipe">
               <img id="cover" class="cover" alt="" draggable="false">
@@ -111,7 +108,7 @@
           <button class="quick-tile" data-open="spotify:collection"><span>▤</span>Your Library</button>
           <button class="quick-tile" data-open="spotify:"><span>✦</span>Spotify home</button>
         </div>
-        <p class="muted small">Without a Spotify developer key (that needs Premium), search, your library and the queue open in the Spotify app. Everything you play there shows up here.</p>
+        <p class="muted small">Search, your library and the queue open in the Spotify app. Everything you play there shows up here.</p>
       </section>
 
       <!-- Themes & settings -->
