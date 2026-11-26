@@ -44,9 +44,23 @@
     return j;
   }
 
-  function saveToken(t) {
-    const old = get('token') || {};
-    set('token', { access: t.access_token, refresh: t.refresh_token || old.refresh, exp: Date.now() + (t.expires_in - 60) * 1000 });
+  /* The login is kept by the Android shell when there is one, so the home-screen widget and sleep timer
+     can use it while the app is closed. In a plain browser it lives in localStorage. */
+  const hasNativeToken = () => !!(native() && native().tokenGet);
+  function getToken() {
+    if (hasNativeToken()) { try { const s = native().tokenGet(); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+    return get('token');
+  }
+  function setToken(v) {
+    if (hasNativeToken()) { native().tokenSet(v ? JSON.stringify(v) : ''); return; }
+    set('token', v);
+  }
+  // Move a login saved by version 1.0 (localStorage) into the shell's storage.
+  if (hasNativeToken() && !getToken() && get('token')) { const t = get('token'); t.clientId = t.clientId || get('clientId'); setToken(t); set('token', null); }
+
+  function saveToken(t, clientId) {
+    const old = getToken() || {};
+    setToken({ access: t.access_token, refresh: t.refresh_token || old.refresh, exp: Date.now() + (t.expires_in - 60) * 1000, clientId: clientId || old.clientId || get('clientId') });
   }
 
   /** Returns true when the URL was a Spotify login redirect that we handled. */
@@ -58,23 +72,29 @@
     if (err) throw new Error(err === 'access_denied' ? 'Login was cancelled.' : 'Spotify said: ' + err);
     if (!pk || pk.state !== state) throw new Error('That login link is old. Tap Connect again.');
     const tok = await tokenRequest({ grant_type: 'authorization_code', code, redirect_uri: redirectUri(), client_id: pk.clientId, code_verifier: pk.verifier });
-    set('clientId', pk.clientId); saveToken(tok);
+    set('clientId', pk.clientId); saveToken(tok, pk.clientId);
     return true;
   }
 
   let refreshing = null;
   async function accessToken() {
-    const t = get('token');
+    const t = getToken();
     if (!t) { const e = new Error('Not logged in'); e.status = 401; e.auth = true; throw e; }
     if (Date.now() < t.exp) return t.access;
     if (!refreshing) {
-      refreshing = tokenRequest({ grant_type: 'refresh_token', refresh_token: t.refresh, client_id: get('clientId') })
-        .then(saveToken)
-        .catch(e => { if (e.status === 400 || e.status === 401) { set('token', null); e.auth = true; } throw e; })
+      refreshing = tokenRequest({ grant_type: 'refresh_token', refresh_token: t.refresh, client_id: t.clientId || get('clientId') })
+        .then(tok => saveToken(tok))
+        .catch(e => {
+          // The widget may have refreshed at the same moment; if a fresh token is now stored, use that.
+          const now = getToken();
+          if (now && Date.now() < now.exp) return;
+          if (e.status === 400 || e.status === 401) { setToken(null); e.auth = true; }
+          throw e;
+        })
         .finally(() => { refreshing = null; });
     }
     await refreshing;
-    return get('token').access;
+    return getToken().access;
   }
 
   async function api(path, opts = {}) {
@@ -85,7 +105,7 @@
       const headers = { Authorization: 'Bearer ' + await accessToken() };
       if (body) headers['Content-Type'] = 'application/json';
       const r = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
-      if (r.status === 401 && attempt === 0) { const t = get('token'); if (t) { t.exp = 0; set('token', t); } continue; }
+      if (r.status === 401 && attempt === 0) { const t = getToken(); if (t) { t.exp = 0; setToken(t); } continue; }
       if (r.status === 429) { await sleep(Math.min(+(r.headers.get('Retry-After') || 1), 5) * 1000); continue; }
       if (r.status === 204 || r.status === 202) return null;
       const text = await r.text();
@@ -101,8 +121,8 @@
 
   window.Spotify = {
     login, handleRedirect, api, redirectUri, get, set,
-    loggedIn: () => !!get('token'),
-    clientId: () => get('clientId'),
-    logout: () => set('token', null),
+    loggedIn: () => !!getToken(),
+    clientId: () => (getToken() || {}).clientId || get('clientId'),
+    logout: () => setToken(null),
   };
 })();
