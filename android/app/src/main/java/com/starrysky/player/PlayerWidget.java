@@ -12,8 +12,6 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Shader;
-import android.media.MediaMetadata;
-import android.media.session.MediaController;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.RemoteViews;
@@ -28,7 +26,10 @@ public class PlayerWidget extends AppWidgetProvider {
     private static Bitmap roundArt = null;
 
     @Override
-    public void onUpdate(Context ctx, AppWidgetManager mgr, int[] ids) { render(ctx); }
+    public void onUpdate(Context ctx, AppWidgetManager mgr, int[] ids) {
+        Player.ensureRegistered(ctx);
+        render(ctx);
+    }
 
     @Override
     public void onReceive(Context ctx, Intent intent) {
@@ -37,8 +38,9 @@ public class PlayerWidget extends AppWidgetProvider {
         String cmd = ACTION_TOGGLE.equals(a) ? "toggle" : ACTION_NEXT.equals(a) ? "next" : ACTION_PREV.equals(a) ? "prev" : null;
         if (cmd == null) return;
         final Context app = ctx.getApplicationContext();
-        if ("toggle".equals(cmd) && Player.find(app) == null && Player.hasAccess(app)) {
-            Player.openSpotify(app); // nothing playing yet: open Spotify so there is something to control
+        Player.ensureRegistered(app);
+        if ("toggle".equals(cmd) && !Player.ready(app)) {
+            Player.openSpotify(app); // nothing known yet: open Spotify so there is something to control
             return;
         }
         Player.control(app, cmd, null);
@@ -52,21 +54,17 @@ public class PlayerWidget extends AppWidgetProvider {
         if (ids.length == 0) return;
         RemoteViews v = new RemoteViews(ctx.getPackageName(), R.layout.widget_player);
 
-        MediaController m = Player.find(ctx);
-        MediaMetadata md = m == null ? null : m.getMetadata();
-        boolean playing = Player.isPlaying(m);
-        if (!Player.hasAccess(ctx)) {
+        android.content.SharedPreferences p = Player.prefs(ctx);
+        boolean playing = Player.playing(ctx);
+        if (!Player.ready(ctx)) {
             v.setTextViewText(R.id.w_title, "StarrySky");
-            v.setTextViewText(R.id.w_artist, "Tap to finish setting up");
-        } else if (md == null) {
-            v.setTextViewText(R.id.w_title, "Nothing playing");
             v.setTextViewText(R.id.w_artist, "Tap play to open Spotify");
         } else {
-            v.setTextViewText(R.id.w_title, Player.text(md, MediaMetadata.METADATA_KEY_TITLE));
-            v.setTextViewText(R.id.w_artist, Player.text(md, MediaMetadata.METADATA_KEY_ARTIST));
+            v.setTextViewText(R.id.w_title, p.getString("s_title", ""));
+            v.setTextViewText(R.id.w_artist, p.getString("s_artist", ""));
         }
 
-        Bitmap cover = md == null ? null : round(Player.artId(md), Player.art(md));
+        Bitmap cover = round(p.getString("s_art_id", ""), Player.artBitmap(ctx));
         if (cover != null) v.setImageViewBitmap(R.id.w_cover, cover); else v.setImageViewResource(R.id.w_cover, R.drawable.ic_w_disc);
 
         v.setImageViewResource(R.id.w_play_icon, playing ? R.drawable.ic_w_pause : R.drawable.ic_w_play);
