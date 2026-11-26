@@ -120,7 +120,8 @@
     $('#cover').classList.toggle('spinning', !!(has && st.playing));
     $('#playIcon').innerHTML = has && st.playing ? '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
     const like = has && likeAction();
-    $('#likeBtn').hidden = !like;
+    // keep the slot even when empty, so previous / play / next stay centred
+    $('#likeBtn').style.visibility = like ? 'visible' : 'hidden';
     if (like) { $('#likeBtn').title = like.name; $('#likeBtn').classList.toggle('on', /remove|unlike|saved|liked$/i.test(like.name)); }
     $('#moreBtn').style.visibility = has && st.actions && st.actions.length ? 'visible' : 'hidden';
     renderProgress(); renderMini();
