@@ -70,12 +70,7 @@
   }
 
   /* ---------------- setup / main ---------------- */
-  const hasAccess = () => !!(native() && native().hasAccess && native().hasAccess());
-
-  function showSetup() {
-    $('#main').hidden = true; $('#setup').hidden = false;
-    $('#setupPhone').hidden = !native(); $('#setupBrowser').hidden = !!native();
-  }
+  function showSetup() { $('#main').hidden = true; $('#setup').hidden = false; }
   function showMain() {
     $('#setup').hidden = true; $('#main').hidden = false;
     $('#demoBadge').hidden = !S.demo; $('#demoCard').hidden = !S.demo;
@@ -83,14 +78,12 @@
     setState(src.state());
     readVolume();
   }
-  $('#accessBtn').onclick = () => native() && native().openAccessSettings();
-  $('#appInfoBtn').onclick = () => native() && native().openAppInfo();
   $('#demoBtn').onclick = () => { S.demo = true; showMain(); };
-  $('#leaveDemoBtn').onclick = () => { S.demo = false; S.art = ''; S.artId = ''; if (native() && hasAccess()) showMain(); else showSetup(); };
+  $('#leaveDemoBtn').onclick = () => { S.demo = false; S.art = ''; S.artId = ''; if (native()) showMain(); else showSetup(); };
+  $('#hintOpen').onclick = () => { if (native() && native().openSpotify) native().openSpotify(); else src.open('spotify:'); };
 
   window.onNativeResume = () => {
     if (S.demo) return;
-    if (!$('#setup').hidden && hasAccess()) { showMain(); toast('All set ✦ Play something in Spotify.'); return; }
     if (!$('#main').hidden) { setState(src.state()); readVolume(); }
   };
 
@@ -115,6 +108,9 @@
 
   function render() {
     const st = S.st, has = !!(st && st.has);
+    $('#hint').hidden = has || S.demo || !native();
+    $('#coverSwipe').parentElement.hidden = !$('#hint').hidden;
+    $('.swipe-tip').hidden = !has;
     $('#deviceName').textContent = has ? (st.app || 'Music') : 'No music playing';
     $('#title').textContent = has ? (st.title || 'Unknown song') : 'Nothing playing';
     $('#artist').textContent = has ? (st.artist || '') : (native() || S.demo ? 'Start a song in Spotify' : '');
@@ -134,7 +130,7 @@
     if (S.seeking) return;
     const st = S.st, dur = st && st.has ? st.duration || 0 : 0, pos = livePos();
     $('#seek').value = dur ? Math.round(pos / dur * 1000) : 0; setPct($('#seek'));
-    $('#seek').disabled = !dur;
+    $('#seek').disabled = !dur || st.canSeek === false;
     $('#pos').textContent = fmt(pos); $('#dur').textContent = fmt(dur);
   }
   function renderMini() {
@@ -213,10 +209,10 @@
       busy = true; haptic();
       sw.style.transition = 'transform .22s ease-in, opacity .22s';
       sw.style.transform = `translateX(${dir > 0 ? -130 : 130}vw) rotate(${dir > 0 ? -25 : 25}deg)`; sw.style.opacity = '0';
-      const oldId = S.artId;
+      const oldTitle = S.st && S.st.title, oldArt = S.artId;
       src.control(dir > 0 ? 'next' : 'prev');
-      // wait for the new song's cover (or give up after a moment)
-      for (let i = 0; i < 12 && S.artId === oldId; i++) await new Promise(r => setTimeout(r, 100));
+      // wait for the new song (and ideally its cover), or give up after a moment
+      for (let i = 0; i < 15 && (S.st && S.st.title === oldTitle || S.artId === oldArt); i++) await new Promise(r => setTimeout(r, 100));
       sw.style.transition = 'none'; sw.style.transform = `translateX(${dir > 0 ? 130 : -130}vw) rotate(${dir > 0 ? 25 : -25}deg)`;
       void sw.offsetWidth; // apply the start position before animating in
       reset(true); busy = false;
@@ -305,7 +301,7 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('#main').hidden) { setState(src.state()); readVolume(); } });
 
     if (/[?&]demo\b/.test(location.search)) { S.demo = true; showMain(); return; }
-    if (native() && hasAccess()) showMain(); else showSetup();
+    if (native()) showMain(); else showSetup();
   }
   boot();
 })();
