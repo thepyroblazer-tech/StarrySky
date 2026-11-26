@@ -8,7 +8,6 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.WindowInsets;
@@ -39,6 +38,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        Player.ensureRegistered(this);
         getWindow().setStatusBarColor(Color.TRANSPARENT);
         getWindow().setNavigationBarColor(Color.TRANSPARENT);
         getWindow().getDecorView().setSystemUiVisibility(
@@ -148,34 +148,14 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void startSettings(Intent primary, Intent fallback) {
-        try { startActivity(primary); } catch (Exception e) {
-            try { startActivity(fallback); } catch (Exception ignored) { }
-        }
-    }
-
     /** Methods callable from JavaScript as window.StarryNative.*. */
     class Bridge {
+        /** True once Spotify has broadcast a song (its Device Broadcast Status setting is on). */
         @JavascriptInterface
-        public boolean hasAccess() { return Player.hasAccess(MainActivity.this); }
+        public boolean ready() { return Player.ready(MainActivity.this); }
 
         @JavascriptInterface
-        public void openAccessSettings() {
-            Intent fallback = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
-            if (Build.VERSION.SDK_INT >= 30) {
-                Intent detail = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
-                        .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, Player.listener(MainActivity.this).flattenToString());
-                runOnUiThread(() -> startSettings(detail, fallback));
-            } else {
-                runOnUiThread(() -> startSettings(fallback, fallback));
-            }
-        }
-
-        @JavascriptInterface
-        public void openAppInfo() {
-            Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()));
-            runOnUiThread(() -> startSettings(i, new Intent(Settings.ACTION_SETTINGS)));
-        }
+        public void openSpotify() { runOnUiThread(() -> Player.openSpotify(MainActivity.this)); }
 
         @JavascriptInterface
         public String playerState() {
