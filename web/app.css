@@ -79,6 +79,15 @@ h2 { font-size: 15px; margin: 26px 0 10px; color: var(--sub); text-transform: up
 .chip.big { padding: 13px; font-size: 15px; border-radius: 14px; background: rgba(255,255,255,.09); border: 1px solid var(--line); }
 .chip.big:active { background: var(--accent); color: var(--accent-ink); }
 
+.quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.quick-tile { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 6px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); font-size: 13px; font-weight: 700; }
+.quick-tile span { font-size: 22px; color: var(--accent); text-shadow: 0 0 12px var(--accent); }
+.quick-tile:active { transform: scale(.96); }
+#searchForm .btn { margin-top: 10px; }
+.act-ic { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.08); color: var(--accent); flex: none; }
+#seek:disabled { opacity: .4; }
+.steps li { margin-bottom: 12px; }
+
 /* drag a song row left to queue it */
 .swipe-wrap { position: relative; border-radius: 12px; overflow: hidden; }
 .swipe-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-right: 18px; border-radius: 12px;
