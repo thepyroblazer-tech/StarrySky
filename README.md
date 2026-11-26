@@ -1,68 +1,46 @@
 # StarrySky
 
-A themed Spotify remote for Android (built for a OnePlus 12). It uses Spotify's official Web API. The Spotify app still does the actual playback, so keep it installed. Controlling playback needs Spotify Premium.
+An animated, themed remote for Spotify on Android, built for a OnePlus 12. It controls Spotify the same way your lock screen and earbuds do, through Android's media controls. It works with **free Spotify**, with no login and no developer key.
 
-- `web/`: the whole app (HTML/CSS/JS). Themes are in `themes.js`, Spotify login and requests in `spotify.js`, screens in `app.js`, and a fake Spotify for demo mode in `demo.js`.
-- `android/`: a small Android wrapper that packages `web/` into an APK and handles the Spotify login redirect (`starrysky://callback`).
+- `web/`: the app's screens (HTML/CSS/JS). Themes are in `themes.js`, the screens in `app.js`, and a fake player for demo mode in `demo.js`.
+- `android/`: the Android app. It packages `web/` and reads/controls the playing music through media sessions (`Player.java`, `StarryListener.java`). It also has the home-screen widget (`PlayerWidget.java`) and the sleep timer (`SleepReceiver.java`).
+
+## What it does
+- **Now playing:** a big round album cover that spins while music plays, title and artist, seek bar, previous, play/pause, next, and phone volume.
+- **Swipe the cover:** left for the next song, right for the previous one.
+- **Like and more:** the ♥ button and the ⋯ menu show the extra buttons Spotify offers on your lock screen (like, shuffle, radio and so on).
+- **Sleep timer:** 5 minutes to 1.5 hours, or end of this song. It pauses the music even when StarrySky is closed.
+- **Home-screen widget:** round cover, title, artist, and previous / play-pause / next, coloured to match your theme. Long-press the home screen → Widgets → StarrySky.
+- **Search:** hands off to the Spotify app's search, along with quick buttons for Liked Songs and Your Library.
 
 ## Themes
-- **StarryNight**: all 7 colour schemes (Base, Cotton Candy, Forest, Galaxy, Orange, Sky, Sunrise), with twinkling stars, shooting stars and a spinning round album cover. It's based on the StarryNight Spicetify theme by b-chen00 (spicetify-themes, MIT licence).
-- **Aurora**: northern lights drifting over a starry sky.
+- **StarryNight**: all 7 colour schemes (Base, Cotton Candy, Forest, Galaxy, Orange, Sky, Sunrise), with twinkling stars and shooting stars. It's based on the StarryNight Spicetify theme by b-chen00 (spicetify-themes, MIT licence).
+- **Aurora**: northern lights over a starry sky.
 - **Rain**: drops sliding down glass, with city lights behind.
 - **Lava lamp**: warm glowing blobs.
 - **Fireflies**: blinking fireflies over a dark meadow.
-- **Snowfall**: three layers of drifting snow, a moon, and a snowbank.
+- **Snowfall**: drifting snow, a moon, and a snowbank.
 - **Album glow**: the colours and a blurred copy of the current album cover, changing with every song.
 
 Motion can be set to Full, Calm or Still. Album-cover spin can be turned off.
 
-## Gestures and extras (1.1.0)
-- **Swipe the cover**: left for the next song, right for the previous one.
-- **Drag a song to the left** in any list (Library, Search, a playlist) to add it to the queue. The phone gives a small buzz when you've pulled far enough.
-- **Sleep timer**: 5 to 90 minutes, or "end of this song". It pauses Spotify even if StarrySky is closed.
-- **Home-screen widget**: long-press the home screen → Widgets → StarrySky. It shows the cover, title and artist, with previous, play/pause and next buttons. It uses your current theme's colour.
+## Setting it up on the phone
+1. Install `StarrySky.apk` from the latest release.
+2. Open StarrySky and tap **Open notification access**. Find **StarrySky** and switch it on. This is how Android lets an app see and control what's playing. StarrySky ignores your actual notifications.
+3. If Android shows **"Restricted setting"**: go back, tap **Open app info**, then the **⋮** menu at the top right → **Allow restricted settings**, and try step 2 again. Android does this for every app installed outside the Play Store.
+4. Go back to StarrySky and play something in Spotify. It shows up straight away.
 
-## Connecting your Spotify account
-StarrySky talks to Spotify through a free developer key that belongs to you. You set it up once.
-1. On the phone or PC, go to **developer.spotify.com/dashboard** and log in with your normal Spotify account. The first time, accept Spotify's developer terms and verify your email if it asks.
-2. Tap **Create app** and fill it in:
-   - **App name:** StarrySky (any name works)
-   - **App description:** My themed Spotify remote (anything)
-   - **Website:** leave it empty
-   - **Redirect URIs:** type `starrysky://callback` exactly, then tap **Add**
-   - **Which API/SDKs are you planning to use?** tick **Web API**
-   - Tick the terms box and tap **Save**
-3. Open the app's **Settings** and copy the **Client ID** (32 letters and numbers). You don't need the Client secret.
-4. Open StarrySky on the phone, paste the Client ID, and tap **Connect Spotify**.
-5. The browser opens Spotify's login. Log in, tap **Agree**, and the phone jumps back into StarrySky.
-6. Open the Spotify app and start any song. StarrySky now shows and controls it.
+## What it can't do (without Spotify Premium)
+Spotify only gives its developer key, the Web API, to Premium accounts. Without it, Android's media controls don't include your library, playlists, search results or the queue. So:
+- Search, Library and Liked Songs open in the Spotify app.
+- Songs can't be added to the queue from StarrySky.
+- Shuffle and repeat only appear if Spotify offers them as lock-screen buttons, in the ⋯ menu.
 
-If something goes wrong:
-- **"INVALID_CLIENT: Invalid redirect URI"**: the redirect URI in the dashboard doesn't exactly match `starrysky://callback`.
-- **"Needs Spotify Premium"**: Spotify only lets apps control playback for Premium accounts.
-- **Nothing playing / no device**: open the Spotify app and play something for a second, then tap the device button at the top of StarrySky.
-- **Another Spotify account**: developer apps start in *development mode*, so only you can use yours. To let someone else log in, add their Spotify email under the app's **User Management**.
+## Building
+1. Open `android/` in Android Studio, or run `android\gradlew.bat assembleDebug` with `JAVA_HOME` set to Android Studio's `jbr` folder.
+2. The APK is written to `android\app\build\outputs\apk\debug\app-debug.apk`.
 
-## 1. Build the APK (on the PC)
-1. Open **Android Studio**. If it asks to set up the Android SDK, accept its defaults and let it download. The SDK on this PC was missing as of 2026-11-26.
-2. **File → Open** → choose `C:\Users\leole\StarrySky\android`. Let it sync: it downloads Gradle and the libraries, and asks you to accept the SDK licences.
-3. **Build → Build App Bundle(s) / APK(s) → Build APK(s)**.
-4. The APK ends up at `android\app\build\outputs\apk\debug\app-debug.apk`.
+Updates must be signed with the same key as the installed app: `%USERPROFILE%\.android\debug.keystore`, with a backup outside the repo. Never commit it.
 
-## 2. Install on the phone
-- Copy `app-debug.apk` to the phone (USB, Google Drive, or Phone Link), tap it, and allow "Install unknown apps" for the app you opened it from.
-- Or, with USB debugging on: `adb install -r app-debug.apk`.
-
-## 3. Connect Spotify (one time)
-See **Connecting your Spotify account** above.
-
-## Updating
-Install a new APK over the old one. Your theme and login stay as they are. Updates must be signed with the same key: it lives in `%USERPROFILE%\.android\debug.keystore`, with a backup in `C:\Users\leole\StarrySky-keys\`. If that key is lost, the app has to be uninstalled before a new build will install.
-
-## Testing on the PC
-Serve `web/` on localhost, for example `python -m http.server 8737 --directory web`. Open `http://localhost:8737/index.html?demo` for demo mode. To log in for real from the PC, add `http://localhost:8737/index.html` as a second redirect URI.
-
-## Limits (Spotify's, not the app's)
-- Playback control needs Premium. Some phones don't allow volume changes from other apps.
-- Apps can't reorder the queue, and there's no lyrics API.
-- Spotify developer apps in "development mode" only work for the owner and a few allow-listed users.
+## Testing on a PC
+Serve `web/`, for example with `python -m http.server 8737 --directory web`. Open `http://127.0.0.1:8737/index.html` and tap **Try the demo**.
